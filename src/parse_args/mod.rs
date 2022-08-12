@@ -4,6 +4,7 @@ use std::str::FromStr;
 use std::fs::File;
 use std::io::Read;
 use dimension_location::DimensionsLocation;
+use crate::object::Object;
 
 pub use subcommand::Subcommand;
 
@@ -19,7 +20,7 @@ pub enum ParseArgsError {
 	#[error("Please specify a valid subcommand (either `shielding` or `wiring`)")]
 	InvalidSubcommand,
 	#[error("Zero objects have been specified")]
-	NoDimensions,
+	NoObjects,
 	#[error("--file expects file")]
 	NoFileArg,
 	#[error("Failed to read from file ({0})")]
@@ -30,7 +31,7 @@ pub enum ParseArgsError {
 
 
 /// Parses dimensions from file. Each dimension should be separated by a new line
-pub fn parse_file_contents(dimensions_list: &mut Vec<(f64,f64,f64)>, file_string: &str) -> Result<(), ParseArgsError> {
+pub fn parse_file_contents(objects_list: &mut Vec<Object>, file_string: &str) -> Result<(), ParseArgsError> {
 	use ParseArgsError::*;
 	for (lineno, line) in file_string.split("\n").enumerate() {
 		let line = line.trim(); // remove whitespace
@@ -38,17 +39,17 @@ pub fn parse_file_contents(dimensions_list: &mut Vec<(f64,f64,f64)>, file_string
 			continue;
 		}
 		
-		let dimensions = parse_dimensions_string(line)
+		let object = parse_dimensions_string(line)
 			.map_err(|e| {
 				InvalidDimensions(e, DimensionsLocation::File{line: lineno+1}) // record lineno when error occurs
 			})?;
-		dimensions_list.push(dimensions);
+		objects_list.push(object);
 	}
 	Ok(())
 } 
 
 /// Parses arguments from the command line. Expects the format `[PROGRAMNAME, subcommand, (file), DIMENSIONS]`
-pub fn parse_args(args: impl Iterator<Item=String>) -> Result<(Subcommand, Vec<(f64,f64,f64)>), ParseArgsError> {
+pub fn parse_args(args: impl Iterator<Item=String>) -> Result<(Subcommand, Vec<Object>), ParseArgsError> {
 	use ParseArgsError::*;
 	
 	let args: Vec<_> = args
@@ -66,10 +67,10 @@ pub fn parse_args(args: impl Iterator<Item=String>) -> Result<(Subcommand, Vec<(
 	};
 	
 	if args.get(1).is_none() {
-		return Err(NoDimensions);
+		return Err(NoObjects);
 	}
 	
-	let mut dimensions_list = Vec::new();
+	let mut objects_list = Vec::new();
 	let mut current_cmd_arg; // for after the file loop, need to look at remaining args
 	
 	if args[1] == "--file" {
@@ -83,7 +84,7 @@ pub fn parse_args(args: impl Iterator<Item=String>) -> Result<(Subcommand, Vec<(
 		file.read_to_string(&mut contents)?;
 		
 		
-		parse_file_contents(&mut dimensions_list, &contents)?;
+		parse_file_contents(&mut objects_list, &contents)?;
 		current_cmd_arg = 3; // 4th arg will be the next one
 	}
 	else {
@@ -99,18 +100,18 @@ pub fn parse_args(args: impl Iterator<Item=String>) -> Result<(Subcommand, Vec<(
 			})?;
 		
 		// add each arg to dimensions list
-		dimensions_list.push(dimensions);
+		objects_list.push(dimensions);
 		current_cmd_arg += 1;
 	}
 	
-	// refuse to process no boxes
-	if dimensions_list.is_empty() {
-		return Err(NoDimensions);
+	// refuse to process no objects
+	if objects_list.is_empty() {
+		return Err(NoObjects);
 	}
 	
 	
 	
-	Ok((subcommand, dimensions_list))
+	Ok((subcommand, objects_list))
 }
 
 // ParseArgsError is compared only by discriminants (only used in testing)

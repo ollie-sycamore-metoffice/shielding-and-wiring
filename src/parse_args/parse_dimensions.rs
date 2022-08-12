@@ -1,12 +1,13 @@
 use thiserror::Error;
+use crate::object::Object;
 
 /// Contains information on why a dimensions string could not be parsed
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ParseDimensionsError {
 	#[error("Cannot have 0 dimensions!")]
 	ZeroDimensions,
-	#[error("Must have exactly 3 dimensions (not {{provided}})")]
-	MustHave3Dimensions { provided: usize },
+	#[error("Too many/few dimensions - must be either a cylinder or box")]
+	InvalidObject,
 	#[error("Dimension {dimension} is not a valid number")]
 	InvalidFloat { dimension: usize },
 	#[error("Dimension {dimension} is less than or equal to 0")]
@@ -14,7 +15,7 @@ pub enum ParseDimensionsError {
 }
 
 /// Parses a string containg dimensions in the format `WxLxH` where `W`,`H` and `L` are floats
-pub fn parse_dimensions_string(string: &str) -> Result<(f64,f64,f64), ParseDimensionsError> {
+pub fn parse_dimensions_string(string: &str) -> Result<Object, ParseDimensionsError> {
 	use ParseDimensionsError::*;
 	
 	if string.is_empty() {
@@ -32,10 +33,9 @@ pub fn parse_dimensions_string(string: &str) -> Result<(f64,f64,f64), ParseDimen
 		dimensions.push(value);
 	}
 	
+	let object = Object::from_values(&dimensions)
+		.map_err(|_| InvalidObject)?;
 	
-	if dimensions.len() != 3 {
-		return Err(MustHave3Dimensions {provided: dimensions.len()});
-	}
 	
-	return Ok((dimensions[0], dimensions[1], dimensions[2]));
+	return Ok(object);
 }
